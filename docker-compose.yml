@@ -1,0 +1,51 @@
+services:
+
+  # ── Proxy only (no messaging bots) ──────────────────────────────────────────
+  proxy:
+    image: ghcr.io/ngtrthanh/free-claude-code:latest
+    container_name: fcc-proxy
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "${PORT:-8082}:8082"
+    env_file:
+      - .env
+    environment:
+      MESSAGING_PLATFORM: "none"
+    volumes:
+      - ${CLAUDE_WORKSPACE:-./agent_workspace}:/app/agent_workspace
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Full stack (proxy + Discord/Telegram bots) ───────────────────────────────
+  full:
+    image: ghcr.io/ngtrthanh/free-claude-code:latest
+    container_name: fcc-full
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "${PORT:-8082}:8082"
+    env_file:
+      - .env
+    volumes:
+      - ${CLAUDE_WORKSPACE:-./agent_workspace}:/app/agent_workspace
+      - fcc-sessions:/app/sessions
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - full
+
+volumes:
+  fcc-sessions:
