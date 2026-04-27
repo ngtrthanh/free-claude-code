@@ -638,9 +638,9 @@ socksio==1.0.0 \
     --hash=sha256:95dc1f15f9b34e8d7b16f06d74b8ccf48f609af32ab33c608d08761c5dcbb1f3 \
     --hash=sha256:f88beb3da5b5c38b9890469de67d0cb0f9d494b78b106ca1845f96c10b91c4ac
     # via httpx
-starlette==0.52.1 \
-    --hash=sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74 \
-    --hash=sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933
+starlette==1.0.0 \
+    --hash=sha256:6a4beaf1f81bb472fd19ea9b918b50dc3a77a6f2e190a12954b25e6ed5eea149 \
+    --hash=sha256:d3ec55e0bb321692d275455ddfd3df75fff145d009685eb40dc91fc66b03d38b
     # via fastapi
 tiktoken==0.12.0 \
     --hash=sha256:285ba9d73ea0d6171e7f9407039a290ca77efcdb026be7769dccc01d2c8d7fff \
