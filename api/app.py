@@ -17,6 +17,7 @@ from providers.exceptions import ProviderError
 from .routes import router
 from .runtime import AppRuntime
 from .validation_log import summarize_request_validation_body
+from .dashboard import dashboard_router
 
 
 @asynccontextmanager
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
 
     # Register routes
     app.include_router(router)
+    app.include_router(dashboard_router)
 
     # Exception handlers
     @app.exception_handler(RequestValidationError)

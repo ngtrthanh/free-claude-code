@@ -126,6 +126,8 @@ class CortexProvider(BaseProvider):
         thinking_enabled: bool | None = None,
     ) -> AsyncIterator[str]:
         """Try each candidate provider in order, yielding from the first that works."""
+        from core.cortex_metrics import CortexMetrics
+        from providers.cortex.scorer import TIER_LOCAL
 
         candidates = self._resolve_candidates(request, input_tokens)
 
@@ -135,7 +137,22 @@ class CortexProvider(BaseProvider):
                 "Set CORTEX_LOCAL_MODELS, CORTEX_SMART_MODELS, etc. in your .env"
             )
 
+        metrics = CortexMetrics.get()
         last_error: Exception | None = None
+        fallback_count = 0
+        req_id = request_id or "unknown"
+
+        # Determine tier for the first candidate
+        from providers.cortex.scorer import score_request, score_to_tier
+
+        score = score_request(request, input_tokens)
+        override = get_brain_override()
+        if override and override in self._tier_config.models:
+            tier = override
+        elif override and "/" in override:
+            tier = "direct"
+        else:
+            tier = score_to_tier(score, self._tier_config.thresholds)
 
         for provider_id, model_name in candidates:
             # Patch the model name on a copy of the request
@@ -147,19 +164,47 @@ class CortexProvider(BaseProvider):
                     "CORTEX: trying provider={} model={} request_id={}",
                     provider_id,
                     model_name,
-                    request_id,
+                    req_id,
                 )
-                async for chunk in provider.stream_response(
-                    patched,
+
+                # Record start
+                await metrics.request_started(
+                    request_id=req_id,
+                    model=getattr(request, "model", "unknown"),
+                    provider_id=provider_id,
+                    provider_model=model_name,
+                    tier=tier,
+                    score=score,
                     input_tokens=input_tokens,
-                    request_id=request_id,
-                    thinking_enabled=thinking_enabled,
-                ):
-                    yield chunk
-                return  # success — done
+                )
+
+                try:
+                    async for chunk in provider.stream_response(
+                        patched,
+                        input_tokens=input_tokens,
+                        request_id=req_id,
+                        thinking_enabled=thinking_enabled,
+                    ):
+                        # Count output tokens from text_delta events
+                        if '"text_delta"' in chunk or '"thinking_delta"' in chunk:
+                            await metrics.token_emitted(req_id)
+                        yield chunk
+
+                    await metrics.request_finished(
+                        req_id, success=True, fallback_count=fallback_count
+                    )
+                    return  # success — done
+
+                except Exception as e:
+                    await metrics.request_finished(
+                        req_id, success=False, fallback_count=fallback_count
+                    )
+                    raise e
 
             except Exception as e:
                 last_error = e
+                fallback_count += 1
+                tier = "fallback"  # mark subsequent attempts as fallback
                 logger.warning(
                     "CORTEX: provider={} model={} failed ({}), trying next",
                     provider_id,
