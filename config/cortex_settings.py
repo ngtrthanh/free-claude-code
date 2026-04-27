@@ -28,6 +28,8 @@ CORTEX_FALLBACK_DESCENDING  Try cheaper tiers on failure  (default: true)
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from config.settings import _env_files
+
 
 class CortexSettings(BaseSettings):
     """Smart-routing tier configuration loaded from environment variables."""
@@ -83,5 +85,7 @@ class CortexSettings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
+        env_file=_env_files(),
+        env_file_encoding="utf-8",
         extra="ignore",
     )
