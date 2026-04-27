@@ -138,6 +138,14 @@ class ClaudeProxyService:
             logger.debug("No optimization matched, routing to provider")
 
             provider = self._provider_getter(routed.resolved.provider_id)
+
+            # Apply cortex tier hint from virtual model name (e.g. cortex-smart)
+            if routed.resolved.cortex_tier_hint is not None:
+                from providers.registry import set_cortex_brain_sync
+
+                hint = routed.resolved.cortex_tier_hint
+                set_cortex_brain_sync(None if hint == "auto" else hint)
+
             provider.preflight_stream(
                 routed.request,
                 thinking_enabled=routed.resolved.thinking_enabled,

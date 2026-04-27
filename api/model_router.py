@@ -10,6 +10,16 @@ from config.settings import Settings
 
 from .models.anthropic import MessagesRequest, TokenCountRequest
 
+# Cortex virtual model prefix — these bypass normal provider/model resolution
+_CORTEX_PREFIX = "cortex-"
+_CORTEX_TIER_MAP = {
+    "cortex-auto": "auto",
+    "cortex-local": "local",
+    "cortex-remote": "remote",
+    "cortex-smart": "smart",
+    "cortex-native": "native",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedModel:
@@ -18,6 +28,7 @@ class ResolvedModel:
     provider_model: str
     provider_model_ref: str
     thinking_enabled: bool
+    cortex_tier_hint: str | None = None  # set when a cortex-* virtual model is used
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +50,19 @@ class ModelRouter:
         self._settings = settings
 
     def resolve(self, claude_model_name: str) -> ResolvedModel:
+        # Handle cortex-* virtual model names
+        if claude_model_name.startswith(_CORTEX_PREFIX):
+            tier = _CORTEX_TIER_MAP.get(claude_model_name, "auto")
+            logger.debug("CORTEX: virtual model {} → tier {}", claude_model_name, tier)
+            return ResolvedModel(
+                original_model=claude_model_name,
+                provider_id="cortex",
+                provider_model=claude_model_name,  # passed through; cortex ignores it
+                provider_model_ref=f"cortex/{claude_model_name}",
+                thinking_enabled=self._settings.resolve_thinking(claude_model_name),
+                cortex_tier_hint=tier,
+            )
+
         provider_model_ref = self._settings.resolve_model(claude_model_name)
         thinking_enabled = self._settings.resolve_thinking(claude_model_name)
         provider_id = Settings.parse_provider_type(provider_model_ref)
@@ -53,6 +77,7 @@ class ModelRouter:
             provider_model=provider_model,
             provider_model_ref=provider_model_ref,
             thinking_enabled=thinking_enabled,
+            cortex_tier_hint=None,
         )
 
     def resolve_messages_request(

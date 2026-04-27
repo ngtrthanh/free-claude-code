@@ -53,6 +53,35 @@ SUPPORTED_CLAUDE_MODELS = [
     ),
 ]
 
+# Cortex virtual models — appear in the model list so clients can select them
+CORTEX_MODELS = [
+    ModelResponse(
+        id="cortex-auto",
+        display_name="Cortex (Auto)",
+        created_at="2025-01-01T00:00:00Z",
+    ),
+    ModelResponse(
+        id="cortex-local",
+        display_name="Cortex (Local)",
+        created_at="2025-01-01T00:00:00Z",
+    ),
+    ModelResponse(
+        id="cortex-remote",
+        display_name="Cortex (Remote)",
+        created_at="2025-01-01T00:00:00Z",
+    ),
+    ModelResponse(
+        id="cortex-smart",
+        display_name="Cortex (Smart)",
+        created_at="2025-01-01T00:00:00Z",
+    ),
+    ModelResponse(
+        id="cortex-native",
+        display_name="Cortex (Native)",
+        created_at="2025-01-01T00:00:00Z",
+    ),
+]
+
 
 def get_proxy_service(
     request: Request,
@@ -141,11 +170,12 @@ async def probe_health():
 @router.get("/v1/models", response_model=ModelsListResponse)
 async def list_models(_auth=Depends(require_api_key)):
     """List the Claude model ids this proxy advertises for compatibility."""
+    all_models = SUPPORTED_CLAUDE_MODELS + CORTEX_MODELS
     return ModelsListResponse(
-        data=SUPPORTED_CLAUDE_MODELS,
-        first_id=SUPPORTED_CLAUDE_MODELS[0].id if SUPPORTED_CLAUDE_MODELS else None,
+        data=all_models,
+        first_id=all_models[0].id if all_models else None,
         has_more=False,
-        last_id=SUPPORTED_CLAUDE_MODELS[-1].id if SUPPORTED_CLAUDE_MODELS else None,
+        last_id=all_models[-1].id if all_models else None,
     )
 
 
@@ -165,3 +195,54 @@ async def stop_cli(request: Request, _auth=Depends(require_api_key)):
     count = await handler.stop_all_tasks()
     logger.info("STOP_CLI: source=handler cancelled_count={}", count)
     return {"status": "stopped", "cancelled_count": count}
+
+
+# =============================================================================
+# Cortex brain override
+# =============================================================================
+@router.post("/v1/cortex/brain")
+async def set_cortex_brain(request: Request, _auth=Depends(require_api_key)):
+    """Override Cortex routing brain for the current process.
+
+    Body (JSON):
+        {"brain": "local"}    — force local tier
+        {"brain": "remote"}   — force remote tier
+        {"brain": "smart"}    — force smart tier
+        {"brain": "native"}   — force native tier
+        {"brain": "auto"}     — restore automatic score-based routing
+        {"brain": "nvidia_nim/deepseek-ai/deepseek-v4-pro"}  — force specific model
+
+    Returns the active brain after the change.
+    """
+    from providers.registry import set_cortex_brain, CORTEX_TIER_ORDER as TIER_ORDER
+
+    body = await request.json()
+    brain = body.get("brain", "auto")
+
+    if brain == "auto":
+        await set_cortex_brain(None)
+        logger.info("CORTEX: brain reset to auto")
+        return {"brain": "auto", "mode": "automatic"}
+
+    # Validate: must be a known tier or a provider/model string
+    if brain not in TIER_ORDER and "/" not in brain:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid brain {brain!r}. Use a tier name {TIER_ORDER} or 'provider/model'.",
+        )
+
+    await set_cortex_brain(brain)
+    mode = "tier" if brain in TIER_ORDER else "direct"
+    return {"brain": brain, "mode": mode}
+
+
+@router.get("/v1/cortex/brain")
+async def get_cortex_brain(_auth=Depends(require_api_key)):
+    """Return the current Cortex brain override."""
+    from providers.registry import get_cortex_brain
+
+    override = get_cortex_brain()
+    return {
+        "brain": override or "auto",
+        "mode": "automatic" if override is None else "override",
+    }

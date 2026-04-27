@@ -40,6 +40,12 @@ class ProviderDescriptor:
 
 
 PROVIDER_CATALOG: dict[str, ProviderDescriptor] = {
+    "cortex": ProviderDescriptor(
+        provider_id="cortex",
+        transport_type="anthropic_messages",
+        static_credential="cortex",
+        capabilities=("chat", "streaming", "tools", "thinking", "routing"),
+    ),
     "nvidia_nim": ProviderDescriptor(
         provider_id="nvidia_nim",
         transport_type="openai_chat",
@@ -105,7 +111,10 @@ PROVIDER_CATALOG: dict[str, ProviderDescriptor] = {
 }
 
 # Order matches docs / historical error text; must match PROVIDER_CATALOG keys.
-SUPPORTED_PROVIDER_IDS: tuple[str, ...] = tuple(PROVIDER_CATALOG.keys())
+SUPPORTED_PROVIDER_IDS: tuple[str, ...] = (
+    "cortex",
+    *[k for k in PROVIDER_CATALOG if k != "cortex"],
+)
 
 if len(set(SUPPORTED_PROVIDER_IDS)) != len(SUPPORTED_PROVIDER_IDS):
     raise AssertionError("Duplicate provider ids in PROVIDER_CATALOG key order")

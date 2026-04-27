@@ -1,4 +1,8 @@
-"""Provider descriptors, factory, and runtime registry."""
+"""Provider descriptors, factory, and runtime registry.
+
+Public brain-override API for Cortex is also re-exported here so that
+``api/`` can access it without violating the narrow provider facade contract.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +21,40 @@ ProviderFactory = Callable[[ProviderConfig, Settings], BaseProvider]
 
 # Backwards-compatible name for the catalog (single source: ``config.provider_catalog``).
 PROVIDER_DESCRIPTORS: dict[str, ProviderDescriptor] = PROVIDER_CATALOG
+
+
+def _create_cortex(config: ProviderConfig, settings: Settings) -> BaseProvider:
+    from config.cortex_settings import CortexSettings
+    from providers.cortex import CortexProvider
+    from providers.cortex.tiers import TierConfig
+
+    cs = CortexSettings()
+    tier_config = TierConfig.from_cortex_settings(cs)
+
+    # provider_getter wraps the registry so Cortex can lazily resolve sub-providers
+    registry = _get_or_create_cortex_registry(settings)
+
+    def provider_getter(provider_id: str) -> BaseProvider:
+        return registry.get(provider_id, settings)
+
+    return CortexProvider(
+        config=config,
+        tier_config=tier_config,
+        provider_getter=provider_getter,
+        settings=settings,
+    )
+
+
+# Module-level registry for Cortex sub-providers (separate from the app registry
+# to avoid circular lookups when Cortex is itself in the app registry).
+_cortex_sub_registry: ProviderRegistry | None = None
+
+
+def _get_or_create_cortex_registry(settings: Settings) -> ProviderRegistry:
+    global _cortex_sub_registry
+    if _cortex_sub_registry is None:
+        _cortex_sub_registry = ProviderRegistry()
+    return _cortex_sub_registry
 
 
 def _create_nvidia_nim(config: ProviderConfig, settings: Settings) -> BaseProvider:
@@ -56,6 +94,7 @@ def _create_ollama(config: ProviderConfig, _settings: Settings) -> BaseProvider:
 
 
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
+    "cortex": _create_cortex,
     "nvidia_nim": _create_nvidia_nim,
     "open_router": _create_open_router,
     "deepseek": _create_deepseek,
@@ -143,6 +182,8 @@ def create_provider(provider_id: str, settings: Settings) -> BaseProvider:
 class ProviderRegistry:
     """Cache and clean up provider instances by provider id."""
 
+    """Cache and clean up provider instances by provider id."""
+
     def __init__(self, providers: MutableMapping[str, BaseProvider] | None = None):
         self._providers = providers if providers is not None else {}
 
@@ -176,3 +217,41 @@ class ProviderRegistry:
         if len(errors) > 1:
             msg = "One or more provider cleanups failed"
             raise ExceptionGroup(msg, errors)
+
+
+# ── Cortex brain override — re-exported so api/ can use providers.registry ──
+def get_cortex_brain() -> str | None:
+    """Return the current Cortex brain override (None = auto)."""
+    from providers.cortex.provider import get_brain_override
+
+    return get_brain_override()
+
+
+def set_cortex_brain_sync(value: str | None) -> None:
+    """Set the Cortex brain override synchronously."""
+    from providers.cortex.provider import _set_brain_override_sync
+
+    _set_brain_override_sync(value)
+
+
+async def set_cortex_brain(value: str | None) -> None:
+    """Set the Cortex brain override asynchronously."""
+    from providers.cortex.provider import set_brain_override
+
+    await set_brain_override(value)
+
+
+# Re-export tier constants so api/ doesn't need to import providers.cortex directly
+from providers.cortex.scorer import TIER_ORDER as CORTEX_TIER_ORDER
+
+__all__ = [
+    "PROVIDER_DESCRIPTORS",
+    "PROVIDER_FACTORIES",
+    "ProviderRegistry",
+    "build_provider_config",
+    "create_provider",
+    "get_cortex_brain",
+    "set_cortex_brain",
+    "set_cortex_brain_sync",
+    "CORTEX_TIER_ORDER",
+]
