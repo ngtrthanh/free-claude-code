@@ -102,6 +102,8 @@ class CortexMetrics:
         self._provider_counts: dict[str, int] = {}
         self._tier_counts: dict[str, int] = {}
         self._subscribers: list[asyncio.Queue[dict[str, Any]]] = []
+        # Circuit breaker status pushed by the provider
+        self._circuits: dict[str, float] = {}
 
     @classmethod
     def get(cls) -> CortexMetrics:
@@ -194,6 +196,11 @@ class CortexMetrics:
             self._history.append(event)
         await self._broadcast()
 
+    async def update_circuits(self, circuits: dict[str, float]) -> None:
+        """Update circuit breaker status (called by the provider)."""
+        async with self._lock:
+            self._circuits = dict(circuits)
+
     # ── Snapshot ───────────────────────────────────────────────────────────────
 
     async def snapshot(self) -> dict[str, Any]:
@@ -217,13 +224,9 @@ class CortexMetrics:
             if now - (r.get("elapsed_s", 0) + time.monotonic() - now) < 5
         )
 
-        # Circuit breaker status
-        try:
-            from providers.cortex.provider import get_circuit_status
-
-            circuits = get_circuit_status()
-        except Exception:
-            circuits = {}
+        # Circuit breaker status (pushed by provider via update_circuits)
+        async with self._lock:
+            circuits = dict(self._circuits)
 
         return {
             "brain": get_cortex_brain() or "auto",

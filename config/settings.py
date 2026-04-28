@@ -122,6 +122,16 @@ class Settings(BaseSettings):
         validation_alias="LM_STUDIO_BASE_URL",
     )
 
+    # ==================== OpenAI-Compatible Generic Provider ====================
+    openai_compat_base_url: str = Field(
+        default="http://localhost:1234/v1",
+        validation_alias="OPENAI_COMPAT_BASE_URL",
+    )
+    openai_compat_api_key: str = Field(
+        default="openai-compat",
+        validation_alias="OPENAI_COMPAT_API_KEY",
+    )
+
     # ==================== Llama.cpp Config ====================
     llamacpp_base_url: str = Field(
         default="http://localhost:8080/v1",
@@ -240,6 +250,11 @@ class Settings(BaseSettings):
 
     # ==================== NIM Settings ====================
     nim: NimSettings = Field(default_factory=NimSettings)
+
+    # ==================== Cortex Smart Routing ====================
+    # When MODEL=cortex/auto, Cortex routes by complexity.
+    # Tier models and thresholds live in CortexSettings (CORTEX_* env vars).
+    # No field needed here — CortexSettings is loaded separately in the factory.
 
     # ==================== Voice Note Transcription ====================
     voice_note_enabled: bool = Field(

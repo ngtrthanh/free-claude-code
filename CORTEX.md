@@ -11,29 +11,37 @@ Claude Code / Hermes / any client
   free-claude-code (Cortex enabled)
         │
         ▼
-  ┌─────────────────────────────────┐
-  │  Complexity Scorer (0-100)      │
-  │  • Model tier (opus/sonnet/haiku│
-  │  • Thinking requested?          │
-  │  • Tool count                   │
-  │  • Token count                  │
-  │  • Conversation depth           │
-  └──────────────┬──────────────────┘
-                 │ score
-                 ▼
-  ┌──────────────────────────────────────────────┐
-  │  Tier Router                                 │
-  │                                              │
-  │  0-24  → LOCAL   (oMLX, Ollama, llama.cpp)  │
-  │  25-54 → REMOTE  (OpenRouter free, DeepSeek)│
-  │  55-84 → SMART   (NVIDIA NIM, OR paid)      │
-  │  85-100→ NATIVE  (Anthropic claude-opus)    │
-  └──────────────┬───────────────────────────────┘
-                 │
-                 ▼
-        Try providers in order
-        Fallback on error →
-        next tier up, then down
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Complexity Scorer (0-100)                                      │
+  │  • Model tier hint  (haiku=+0, sonnet=+20, opus=+40)           │
+  │  • Thinking enabled (explicit reasoning request = +30)          │
+  │  • Tool count       (1-3=+10, 4-10=+20, 11+=+30)              │
+  │  • Input tokens     (<500=+0, 2k-8k=+15, 32k+=+35)            │
+  │  • Message depth    (3-6=+5, 7-15=+10, 16+=+15)               │
+  └──────────────────────────────┬──────────────────────────────────┘
+                                 │ score
+                                 ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  Tier Router                                                     │
+  │                                                                  │
+  │  score  0-24  → LOCAL   LM Studio (192.168.11.13:1234)          │
+  │                          model: google/gemma-4-e4b               │
+  │                          transport: Anthropic /v1/messages (LAN) │
+  │                                                                  │
+  │  score 25-54  → REMOTE  OpenRouter free tier / DeepSeek         │
+  │                          model: llama-3.1-8b-instruct:free       │
+  │                          transport: Anthropic Messages (cloud)   │
+  │                                                                  │
+  │  score 55-84  → SMART   NVIDIA NIM / OpenRouter paid            │
+  │                          model: deepseek-ai/deepseek-v4-pro      │
+  │                          transport: OpenAI chat completions       │
+  │                                                                  │
+  │  score 85-100 → NATIVE  OpenRouter → Anthropic claude-opus-4    │
+  │                          transport: Anthropic Messages (cloud)   │
+  │                                                                  │
+  │  On any error → fallback ascending (local→remote→smart→native)  │
+  │               → then descending if all upper tiers fail          │
+  └──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -43,14 +51,16 @@ Set `MODEL="cortex/auto"` in your `.env` and configure at least one tier:
 ```bash
 MODEL="cortex/auto"
 
-# Local tier — free, on-device (score 0-24)
-CORTEX_LOCAL_MODELS="lmstudio/gemma-4-E4B-it-MLX-8bit"
+# LOCAL tier — LM Studio on LAN (score 0-24: quick/simple tasks)
+LM_STUDIO_BASE_URL="http://192.168.11.13:1234/v1"
+CORTEX_LOCAL_MODELS="lmstudio/google/gemma-4-e4b"
 
-# Smart tier — capable cloud (score 55-84)
+# SMART tier — NVIDIA NIM (score 55-84: complex reasoning, tools)
+NVIDIA_NIM_API_KEY="your-key"
 CORTEX_SMART_MODELS="nvidia_nim/deepseek-ai/deepseek-v4-pro"
 ```
 
-That's it. Cortex will route simple requests locally and complex ones to NIM.
+That's it. Simple requests go to LM Studio on your LAN, complex ones go to NIM.
 
 ## Configuration Reference
 
@@ -58,16 +68,24 @@ That's it. Cortex will route simple requests locally and complex ones to NIM.
 
 Each tier takes a comma-separated list of `provider/model` strings. Cortex tries them left-to-right, falling back on error.
 
-| Variable | Default | Description |
-|---|---|---|
-| `CORTEX_LOCAL_MODELS` | _(empty)_ | Local/free tier models |
-| `CORTEX_REMOTE_MODELS` | _(empty)_ | Cheap cloud tier models |
-| `CORTEX_SMART_MODELS` | _(empty)_ | Capable cloud tier models |
-| `CORTEX_NATIVE_MODELS` | _(empty)_ | Native Anthropic tier models |
+| Tier | Score Range | Variable | Current Config |
+|---|---|---|---|
+| **LOCAL** | 0–24 | `CORTEX_LOCAL_MODELS` | `lmstudio/google/gemma-4-e4b` |
+| **REMOTE** | 25–54 | `CORTEX_REMOTE_MODELS` | `open_router/meta-llama/llama-3.1-8b-instruct:free` |
+| **SMART** | 55–84 | `CORTEX_SMART_MODELS` | `nvidia_nim/deepseek-ai/deepseek-v4-pro` |
+| **NATIVE** | 85–100 | `CORTEX_NATIVE_MODELS` | `open_router/anthropic/claude-opus-4` |
+
+**LOCAL** = LM Studio running on your LAN at `192.168.11.13:1234`. Uses the native Anthropic `/v1/messages` endpoint that LM Studio exposes. Free, fast, private — no API quota consumed.
+
+**REMOTE** = Cheap or free cloud models. OpenRouter free tier, DeepSeek API. Good for medium-complexity tasks that need more capability than local but don't justify NIM costs.
+
+**SMART** = NVIDIA NIM with DeepSeek V4 Pro. Full reasoning, tools, thinking tokens. Used for complex coding tasks, multi-step reasoning, heavy tool use.
+
+**NATIVE** = Native Anthropic claude-opus-4 via OpenRouter. Reserved for the hardest tasks (score 85+) — long context + thinking + many tools simultaneously.
 
 Example with multiple fallbacks per tier:
 ```bash
-CORTEX_LOCAL_MODELS="lmstudio/gemma-4-E4B-it-MLX-8bit,ollama/llama3.2"
+CORTEX_LOCAL_MODELS="lmstudio/google/gemma-4-e4b,ollama/llama3.2"
 CORTEX_REMOTE_MODELS="open_router/meta-llama/llama-3.1-8b-instruct:free,deepseek/deepseek-chat"
 CORTEX_SMART_MODELS="nvidia_nim/deepseek-ai/deepseek-v4-pro,open_router/anthropic/claude-sonnet-4"
 CORTEX_NATIVE_MODELS="open_router/anthropic/claude-opus-4"
@@ -247,7 +265,7 @@ MODEL_HAIKU="lmstudio/gemma-4-E4B-it-MLX-8bit"
 
 ## Ports Summary
 
-| Port | Container | Provider |
-|---|---|---|
-| 8082 | `fcc-proxy` | NVIDIA NIM (production) |
-| 8083 | `fcc-cortex` | Cortex smart routing |
+| Port | Container | Provider | Use |
+|---|---|---|---|
+| 8082 | `fcc-proxy` | NVIDIA NIM direct | Production stable |
+| 8083 | `fcc-cortex` | Cortex smart routing | Smart routing with LM Studio + NIM |

@@ -23,6 +23,12 @@ ProviderFactory = Callable[[ProviderConfig, Settings], BaseProvider]
 PROVIDER_DESCRIPTORS: dict[str, ProviderDescriptor] = PROVIDER_CATALOG
 
 
+def _create_openai_compat(config: ProviderConfig, _settings: Settings) -> BaseProvider:
+    from providers.openai_compat_provider import OpenAICompatProvider
+
+    return OpenAICompatProvider(config)
+
+
 def _create_cortex(config: ProviderConfig, settings: Settings) -> BaseProvider:
     from config.cortex_settings import CortexSettings
     from providers.cortex import CortexProvider
@@ -95,6 +101,7 @@ def _create_ollama(config: ProviderConfig, _settings: Settings) -> BaseProvider:
 
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "cortex": _create_cortex,
+    "openai_compat": _create_openai_compat,
     "nvidia_nim": _create_nvidia_nim,
     "open_router": _create_open_router,
     "deepseek": _create_deepseek,

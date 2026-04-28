@@ -46,6 +46,16 @@ PROVIDER_CATALOG: dict[str, ProviderDescriptor] = {
         static_credential="cortex",
         capabilities=("chat", "streaming", "tools", "thinking", "routing"),
     ),
+    "openai_compat": ProviderDescriptor(
+        provider_id="openai_compat",
+        transport_type="openai_chat",
+        credential_env="OPENAI_COMPAT_API_KEY",
+        credential_attr="openai_compat_api_key",
+        static_credential=None,
+        default_base_url="http://localhost:1234/v1",
+        base_url_attr="openai_compat_base_url",
+        capabilities=("chat", "streaming", "tools", "local"),
+    ),
     "nvidia_nim": ProviderDescriptor(
         provider_id="nvidia_nim",
         transport_type="openai_chat",
@@ -113,7 +123,8 @@ PROVIDER_CATALOG: dict[str, ProviderDescriptor] = {
 # Order matches docs / historical error text; must match PROVIDER_CATALOG keys.
 SUPPORTED_PROVIDER_IDS: tuple[str, ...] = (
     "cortex",
-    *[k for k in PROVIDER_CATALOG if k != "cortex"],
+    "openai_compat",
+    *[k for k in PROVIDER_CATALOG if k not in ("cortex", "openai_compat")],
 )
 
 if len(set(SUPPORTED_PROVIDER_IDS)) != len(SUPPORTED_PROVIDER_IDS):
