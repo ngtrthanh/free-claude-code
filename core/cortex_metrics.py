@@ -27,6 +27,7 @@ class ActiveRequest:
     tier: str
     score: int
     input_tokens: int
+    client: str = "unknown"
     started_at: float = field(default_factory=time.monotonic)
     output_tokens: int = 0
     tokens_per_second: float = 0.0
@@ -47,6 +48,7 @@ class ActiveRequest:
             "output_tokens": self.output_tokens,
             "tokens_per_second": round(self.tokens_per_second, 1),
             "elapsed_s": round(self.elapsed_s(), 1),
+            "client": self.client,
         }
 
 
@@ -66,6 +68,7 @@ class RoutingEvent:
     tokens_per_second: float
     success: bool
     fallback_count: int
+    client: str = "unknown"
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -82,6 +85,7 @@ class RoutingEvent:
             "tokens_per_second": round(self.tokens_per_second, 1),
             "success": self.success,
             "fallback_count": self.fallback_count,
+            "client": self.client,
             "timestamp": self.timestamp,
         }
 
@@ -101,9 +105,12 @@ class CortexMetrics:
         self._total_fallbacks: int = 0
         self._provider_counts: dict[str, int] = {}
         self._tier_counts: dict[str, int] = {}
+        self._client_counts: dict[str, int] = {}
         self._subscribers: list[asyncio.Queue[dict[str, Any]]] = []
         # Circuit breaker status pushed by the provider
         self._circuits: dict[str, float] = {}
+        # Brain override pushed by the provider
+        self._brain: str = "auto"
 
     @classmethod
     def get(cls) -> CortexMetrics:
@@ -126,6 +133,7 @@ class CortexMetrics:
         tier: str,
         score: int,
         input_tokens: int,
+        client: str = "unknown",
     ) -> None:
         async with self._lock:
             self._active[request_id] = ActiveRequest(
@@ -136,6 +144,7 @@ class CortexMetrics:
                 tier=tier,
                 score=score,
                 input_tokens=input_tokens,
+                client=client,
             )
             self._total_requests += 1
             self._total_tokens_in += input_tokens
@@ -143,6 +152,7 @@ class CortexMetrics:
                 self._provider_counts.get(provider_id, 0) + 1
             )
             self._tier_counts[tier] = self._tier_counts.get(tier, 0) + 1
+            self._client_counts[client] = self._client_counts.get(client, 0) + 1
         await self._broadcast()
 
     async def token_emitted(self, request_id: str) -> None:
@@ -192,6 +202,7 @@ class CortexMetrics:
                 tokens_per_second=tps,
                 success=success,
                 fallback_count=fallback_count,
+                client=req.client,
             )
             self._history.append(event)
         await self._broadcast()
@@ -201,11 +212,14 @@ class CortexMetrics:
         async with self._lock:
             self._circuits = dict(circuits)
 
+    async def update_brain(self, brain: str | None) -> None:
+        """Update brain override display (called by the provider)."""
+        async with self._lock:
+            self._brain = brain or "auto"
+
     # ── Snapshot ───────────────────────────────────────────────────────────────
 
     async def snapshot(self) -> dict[str, Any]:
-        from providers.registry import get_cortex_brain
-
         async with self._lock:
             active = [r.to_dict() for r in self._active.values()]
             history = [e.to_dict() for e in reversed(self._history)]
@@ -215,8 +229,10 @@ class CortexMetrics:
             total_fb = self._total_fallbacks
             provider_counts = dict(self._provider_counts)
             tier_counts = dict(self._tier_counts)
+            client_counts = dict(self._client_counts)
+            brain = self._brain
+            circuits = dict(self._circuits)
 
-        # Current aggregate tps across all active streams
         now = time.monotonic()
         current_tps = sum(
             r["tokens_per_second"]
@@ -224,12 +240,8 @@ class CortexMetrics:
             if now - (r.get("elapsed_s", 0) + time.monotonic() - now) < 5
         )
 
-        # Circuit breaker status (pushed by provider via update_circuits)
-        async with self._lock:
-            circuits = dict(self._circuits)
-
         return {
-            "brain": get_cortex_brain() or "auto",
+            "brain": brain,
             "active_connections": len(active),
             "active": active,
             "history": history,
@@ -242,6 +254,7 @@ class CortexMetrics:
             "current_tps": round(current_tps, 1),
             "provider_counts": provider_counts,
             "tier_counts": tier_counts,
+            "client_counts": client_counts,
             "circuits": circuits,
             "timestamp": time.time(),
         }

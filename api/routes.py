@@ -107,11 +107,16 @@ def _probe_response(allow: str) -> Response:
 # =============================================================================
 @router.post("/v1/messages")
 async def create_message(
+    request: Request,
     request_data: MessagesRequest,
     service: ClaudeProxyService = Depends(get_proxy_service),
     _auth=Depends(require_api_key),
 ):
     """Create a message (always streaming)."""
+    from api.client_detection import detect_client
+    from core.request_context import current_client
+
+    current_client.set(detect_client(request))
     return service.create_message(request_data)
 
 

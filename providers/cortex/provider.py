@@ -50,11 +50,31 @@ def get_brain_override() -> str | None:
     return _brain_override
 
 
+def _get_current_client() -> str:
+    """Return the current request's client identifier (set by the HTTP layer)."""
+    try:
+        from core.request_context import current_client
+
+        return current_client.get()
+    except Exception:
+        return "unknown"
+
+
 def _set_brain_override_sync(value: str | None) -> None:
     """Set the brain override synchronously (no lock — called from sync service layer)."""
     global _brain_override
     _brain_override = value
     logger.info("CORTEX: brain override set to {!r} (sync)", value)
+    # Push to metrics (best-effort, no await in sync context)
+    try:
+        from core.cortex_metrics import CortexMetrics
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(CortexMetrics.get().update_brain(value))
+    except Exception:
+        pass
 
 
 async def set_brain_override(value: str | None) -> None:
@@ -63,6 +83,9 @@ async def set_brain_override(value: str | None) -> None:
     async with _brain_lock:
         _brain_override = value
     logger.info("CORTEX: brain override set to {!r}", value)
+    from core.cortex_metrics import CortexMetrics
+
+    await CortexMetrics.get().update_brain(value)
 
 
 def _circuit_key(provider_id: str, model_name: str) -> str:
@@ -244,6 +267,7 @@ class CortexProvider(BaseProvider):
                     tier=tier,
                     score=score,
                     input_tokens=input_tokens,
+                    client=_get_current_client(),
                 )
 
                 try:
