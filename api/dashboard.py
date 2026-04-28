@@ -127,6 +127,11 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
 </div>
 
 <section>
+  <h2>Circuit Breakers</h2>
+  <div id="circuit-status" style="padding:8px 0"></div>
+</section>
+
+<section>
   <h2>Active Streams</h2>
   <table id="active-table">
     <thead><tr>
@@ -249,6 +254,16 @@ function update(data) {
       <td>${r.success ? '<span class="success-dot">✓</span>' : '<span class="fail-dot">✗</span>'} ${r.fallback_count > 0 ? `<span style="color:var(--yellow);font-size:10px">${r.fallback_count}fb</span>` : ''}</td>
     </tr>`).join('');
   }
+  // Circuit breaker status
+  const circuits = data.circuits || {};
+  const circuitKeys = Object.keys(circuits);
+  let circuitHtml = '';
+  if (circuitKeys.length > 0) {
+    circuitHtml = circuitKeys.map(k =>
+      `<span style="color:var(--red);font-size:11px;margin-right:12px">⚡ ${k} (${circuits[k]}s)</span>`
+    ).join('');
+  }
+  document.getElementById('circuit-status').innerHTML = circuitHtml || '<span style="color:var(--green);font-size:11px">All providers healthy</span>';
 }
 
 // SSE connection

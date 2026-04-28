@@ -3,11 +3,16 @@
 Routes each request to the best available provider based on complexity score.
 Falls back through tiers on error. Supports explicit brain override via
 a process-level state variable set by the /v1/cortex/brain endpoint.
+
+Circuit breaker: providers that fail with connection errors are cooled down
+for CIRCUIT_COOLDOWN_S seconds before being retried, avoiding repeated
+timeouts on unreachable local endpoints.
 """
 
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -18,10 +23,26 @@ from providers.cortex.scorer import score_request
 from providers.cortex.tiers import TierConfig
 from providers.exceptions import ProviderError
 
-# Process-level brain override: set by POST /v1/cortex/brain
-# None = auto (score-based), otherwise a tier name or provider/model string
+# Process-level brain override
 _brain_override: str | None = None
 _brain_lock = asyncio.Lock()
+
+# Circuit breaker: provider_id → timestamp when it can be retried
+# Keyed by "provider_id/model_name" for per-model granularity
+_circuit_open_until: dict[str, float] = {}
+_circuit_lock = asyncio.Lock()
+
+# How long to skip a provider after a connection failure (seconds)
+CIRCUIT_COOLDOWN_S = 60.0
+
+# Errors that trip the circuit (connectivity issues, not logic errors)
+_CIRCUIT_TRIP_ERRORS = (
+    "ConnectTimeout",
+    "ConnectError",
+    "TimeoutError",
+    "ConnectionError",
+    "RemoteProtocolError",
+)
 
 
 def get_brain_override() -> str | None:
@@ -42,6 +63,42 @@ async def set_brain_override(value: str | None) -> None:
     async with _brain_lock:
         _brain_override = value
     logger.info("CORTEX: brain override set to {!r}", value)
+
+
+def _circuit_key(provider_id: str, model_name: str) -> str:
+    return f"{provider_id}/{model_name}"
+
+
+def _is_circuit_open(provider_id: str, model_name: str) -> bool:
+    """Return True if this provider/model is in cooldown."""
+    key = _circuit_key(provider_id, model_name)
+    until = _circuit_open_until.get(key, 0.0)
+    if until > time.monotonic():
+        return True
+    if key in _circuit_open_until:
+        del _circuit_open_until[key]
+    return False
+
+
+def _trip_circuit(provider_id: str, model_name: str, error: Exception) -> None:
+    """Open the circuit for this provider/model if the error is connectivity-related."""
+    err_type = type(error).__name__
+    if any(t in err_type for t in _CIRCUIT_TRIP_ERRORS):
+        key = _circuit_key(provider_id, model_name)
+        _circuit_open_until[key] = time.monotonic() + CIRCUIT_COOLDOWN_S
+        logger.warning(
+            "CORTEX: circuit opened for {}/{} ({}) — skipping for {}s",
+            provider_id,
+            model_name,
+            err_type,
+            CIRCUIT_COOLDOWN_S,
+        )
+
+
+def get_circuit_status() -> dict[str, float]:
+    """Return remaining cooldown seconds per provider/model key."""
+    now = time.monotonic()
+    return {k: round(v - now, 1) for k, v in _circuit_open_until.items() if v > now}
 
 
 class CortexProvider(BaseProvider):
@@ -155,6 +212,17 @@ class CortexProvider(BaseProvider):
             tier = score_to_tier(score, self._tier_config.thresholds)
 
         for provider_id, model_name in candidates:
+            # Skip if circuit is open (recent connection failure)
+            if _is_circuit_open(provider_id, model_name):
+                logger.debug(
+                    "CORTEX: skipping {}/{} — circuit open",
+                    provider_id,
+                    model_name,
+                )
+                fallback_count += 1
+                tier = "fallback"
+                continue
+
             # Patch the model name on a copy of the request
             patched = request.model_copy(update={"model": model_name}, deep=False)
 
@@ -196,6 +264,7 @@ class CortexProvider(BaseProvider):
                     return  # success — done
 
                 except Exception as e:
+                    _trip_circuit(provider_id, model_name, e)
                     await metrics.request_finished(
                         req_id, success=False, fallback_count=fallback_count
                     )

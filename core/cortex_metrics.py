@@ -217,6 +217,14 @@ class CortexMetrics:
             if now - (r.get("elapsed_s", 0) + time.monotonic() - now) < 5
         )
 
+        # Circuit breaker status
+        try:
+            from providers.cortex.provider import get_circuit_status
+
+            circuits = get_circuit_status()
+        except Exception:
+            circuits = {}
+
         return {
             "brain": get_cortex_brain() or "auto",
             "active_connections": len(active),
@@ -231,6 +239,7 @@ class CortexMetrics:
             "current_tps": round(current_tps, 1),
             "provider_counts": provider_counts,
             "tier_counts": tier_counts,
+            "circuits": circuits,
             "timestamp": time.time(),
         }
 
