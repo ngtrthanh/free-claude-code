@@ -90,7 +90,7 @@ class TierConfig:
         return bool(self.models.get(tier))
 
     @classmethod
-    def from_cortex_settings(cls, cs: CortexSettings) -> TierConfig:  # noqa: F821
+    def from_cortex_settings(cls, cs: CortexSettings) -> TierConfig:
         """Build TierConfig from CortexSettings."""
         models: dict[str, list[str]] = {}
         for tier, raw in [

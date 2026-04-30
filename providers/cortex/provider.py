@@ -19,7 +19,7 @@ from typing import Any
 from loguru import logger
 
 from providers.base import BaseProvider, ProviderConfig
-from providers.cortex.scorer import score_request
+from providers.cortex.scorer import TIER_ORDER, score_request
 from providers.cortex.tiers import TierConfig
 from providers.exceptions import ProviderError
 
@@ -67,8 +67,9 @@ def _set_brain_override_sync(value: str | None) -> None:
     logger.info("CORTEX: brain override set to {!r} (sync)", value)
     # Push to metrics (best-effort, no await in sync context)
     try:
-        from core.cortex_metrics import CortexMetrics
         import asyncio
+
+        from core.cortex_metrics import CortexMetrics
 
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -86,6 +87,7 @@ async def set_brain_override(value: str | None) -> None:
     from core.cortex_metrics import CortexMetrics
 
     await CortexMetrics.get().update_brain(value)
+    await _push_control_plane_to_metrics()
 
 
 def _circuit_key(provider_id: str, model_name: str) -> str:
@@ -93,13 +95,23 @@ def _circuit_key(provider_id: str, model_name: str) -> str:
 
 
 def _is_circuit_open(provider_id: str, model_name: str) -> bool:
-    """Return True if this provider/model is in cooldown."""
+    """Return True if this provider/model is in cooldown or manually disabled."""
+    from providers.cortex.control_plane import get_control_plane
+
     key = _circuit_key(provider_id, model_name)
+    cp = get_control_plane()
+
+    # Manual override takes priority
+    if cp.is_manually_disabled(key):
+        return True
+    if cp.is_manually_enabled(key):
+        return False  # bypass auto circuit
+
+    # Auto circuit breaker
     until = _circuit_open_until.get(key, 0.0)
     if until > time.monotonic():
         return True
-    if key in _circuit_open_until:
-        del _circuit_open_until[key]
+    _circuit_open_until.pop(key, None)
     return False
 
 
@@ -122,6 +134,22 @@ def get_circuit_status() -> dict[str, float]:
     """Return remaining cooldown seconds per provider/model key."""
     now = time.monotonic()
     return {k: round(v - now, 1) for k, v in _circuit_open_until.items() if v > now}
+
+
+async def _push_control_plane_to_metrics(tier_config: object | None = None) -> None:
+    """Push current control plane + circuit state to metrics for dashboard SSE."""
+    try:
+        from core.cortex_metrics import CortexMetrics
+        from providers.cortex.control_plane import get_control_plane
+
+        cp = get_control_plane()
+        import providers.cortex.provider as _self_mod
+
+        cp_snap = cp.snapshot(tier_config)
+        auto_circ = _self_mod.get_circuit_status()
+        await CortexMetrics.get().update_control_plane(cp_snap, auto_circ)
+    except Exception:
+        pass
 
 
 class CortexProvider(BaseProvider):
@@ -151,50 +179,96 @@ class CortexProvider(BaseProvider):
     ) -> list[tuple[str, str]]:
         """Return ordered list of (provider_id, model_name) candidates to try.
 
-        Respects brain override if set.
+        Respects brain override and control plane client pins.
         """
         from config.settings import Settings
+        from providers.cortex.control_plane import get_control_plane
 
+        cp = get_control_plane()
         override = get_brain_override()
+        client = _get_current_client()
 
+        # 1. Brain override (highest priority)
         if override is not None:
-            # Override can be a tier name ("local", "smart") or a full "provider/model"
             if override in self._tier_config.models:
-                # It's a tier name
                 models = self._tier_config.models_for_tier(override)
             elif "/" in override:
-                # It's a direct provider/model string
                 models = [override]
             else:
                 logger.warning(
                     "CORTEX: unknown brain override {!r}, using auto", override
                 )
                 models = []
-
             if models:
                 return [
                     (Settings.parse_provider_type(m), Settings.parse_model_name(m))
                     for m in models
                 ]
 
-        # Auto: score the request and get tier order
+        # 2. Client pin rule
+        pin = cp.get_client_pin(client)
+        if pin is not None:
+            if pin in TIER_ORDER:
+                models = cp.get_tier_models(pin, self._tier_config.models.get(pin, []))
+            elif "/" in pin:
+                models = [pin]
+            else:
+                models = []
+            if models:
+                logger.debug("CORTEX: client {} pinned to {}", client, pin)
+                return [
+                    (Settings.parse_provider_type(m), Settings.parse_model_name(m))
+                    for m in models
+                ]
+
+        # 3. Auto score-based routing with control plane thresholds
         score = score_request(request, input_tokens)
-        tiers = self._tier_config.tiers_for_score(score)
+        effective_thresholds = cp.get_all_thresholds(self._tier_config.thresholds)
+        tiers = self._tiers_for_score_with_cp(score, effective_thresholds)
 
         logger.debug(
-            "CORTEX: score={} tiers={} model={}",
+            "CORTEX: score={} tiers={} model={} client={}",
             score,
             tiers,
             getattr(request, "model", "?"),
+            client,
         )
 
         candidates: list[tuple[str, str]] = []
         for tier in tiers:
-            for model_ref in self._tier_config.models_for_tier(tier):
+            default_models = self._tier_config.models_for_tier(tier)
+            effective_models = cp.get_tier_models(tier, default_models)
+            for model_ref in effective_models:
                 provider_id = Settings.parse_provider_type(model_ref)
                 model_name = Settings.parse_model_name(model_ref)
                 candidates.append((provider_id, model_name))
 
+        return candidates
+
+    def _tiers_for_score_with_cp(
+        self, score: int, thresholds: dict[str, int]
+    ) -> list[str]:
+        """Like TierConfig.tiers_for_score but uses control plane thresholds."""
+        from providers.cortex.control_plane import get_control_plane
+        from providers.cortex.scorer import score_to_tier
+
+        cp = get_control_plane()
+        primary = score_to_tier(score, thresholds)
+        primary_idx = TIER_ORDER.index(primary) if primary in TIER_ORDER else 0
+
+        def has_models(tier: str) -> bool:
+            cp_models = cp.get_tier_models(tier, self._tier_config.models.get(tier, []))
+            return bool(cp_models)
+
+        candidates: list[str] = []
+        if has_models(primary):
+            candidates.append(primary)
+        if cp.get_fallback_ascending(self._tier_config.fallback_ascending):
+            candidates.extend(t for t in TIER_ORDER[primary_idx + 1 :] if has_models(t))
+        if cp.get_fallback_descending(self._tier_config.fallback_descending):
+            candidates.extend(
+                t for t in reversed(TIER_ORDER[:primary_idx]) if has_models(t)
+            )
         return candidates
 
     async def stream_response(
@@ -207,7 +281,6 @@ class CortexProvider(BaseProvider):
     ) -> AsyncIterator[str]:
         """Try each candidate provider in order, yielding from the first that works."""
         from core.cortex_metrics import CortexMetrics
-        from providers.cortex.scorer import TIER_LOCAL
 
         candidates = self._resolve_candidates(request, input_tokens)
 
@@ -285,6 +358,7 @@ class CortexProvider(BaseProvider):
                     await metrics.request_finished(
                         req_id, success=True, fallback_count=fallback_count
                     )
+                    await _push_control_plane_to_metrics(self._tier_config)
                     return  # success — done
 
                 except Exception as e:
@@ -292,6 +366,7 @@ class CortexProvider(BaseProvider):
                     await metrics.request_finished(
                         req_id, success=False, fallback_count=fallback_count
                     )
+                    await _push_control_plane_to_metrics(self._tier_config)
                     raise e
 
             except Exception as e:

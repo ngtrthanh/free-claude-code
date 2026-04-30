@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from providers.cortex.scorer import TIER_LOCAL, TIER_NATIVE, TIER_REMOTE, TIER_SMART
 from providers.cortex.tiers import TierConfig
 

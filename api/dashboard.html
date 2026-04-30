@@ -319,6 +319,190 @@
       max-width: 70px;
     }
 
+    /* ========== Control Panel ========== */
+    .cp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+    .cp-card {
+      position: relative;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .cp-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .cp-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .cp-row:last-child { margin-bottom: 0; }
+    .cp-label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text);
+      flex: 1;
+    }
+    .cp-label small { display: block; font-size: 0.65rem; color: var(--muted); margin-top: 1px; }
+
+    /* Threshold sliders */
+    .threshold-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 110px;
+      height: 5px;
+      border-radius: 4px;
+      background: var(--score-track-bg);
+      outline: none;
+      cursor: pointer;
+    }
+    .threshold-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+    .threshold-val {
+      min-width: 28px;
+      text-align: right;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+    }
+
+    /* Toggle switch */
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+    .toggle {
+      position: relative;
+      width: 40px; height: 22px;
+      cursor: pointer;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 11px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--green); border-color: var(--green); }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.2s;
+      pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+    /* Circuit toggle */
+    .circuit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+    .circuit-row:last-child { border-bottom: none; }
+    .circuit-key {
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      color: var(--text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .circuit-state {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+    .circuit-ok { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
+    .circuit-open { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+    .circuit-manual { background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow); }
+
+    /* Client pin table */
+    .pin-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .pin-row:last-child { margin-bottom: 0; }
+    .pin-client {
+      font-size: 0.75rem;
+      font-weight: 600;
+      min-width: 90px;
+    }
+    .pin-select {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .pin-select:focus { outline: none; border-color: var(--accent); }
+
+    /* Brain selector */
+    .brain-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .brain-select:focus { outline: none; border-color: var(--accent); }
+
+    /* Apply button */
+    .cp-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent);
+      transition: all 0.15s;
+    }
+    .cp-btn:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    .cp-btn-danger { border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); color: var(--red); }
+    .cp-btn-danger:hover { background: color-mix(in srgb, var(--red) 20%, transparent); }
+    .cp-btn-sm { padding: 3px 10px; font-size: 0.68rem; }
+
     /* ========== Sections ========== */
     section {
       margin-top: 36px;
@@ -575,6 +759,125 @@
       </div>
     </div>
 
+    <!-- Control Panel -->
+    <section>
+      <h2>Control Panel</h2>
+      <div class="cp-grid">
+
+        <!-- Brain override -->
+        <div class="cp-card">
+          <div class="cp-title">Brain Override</div>
+          <div class="cp-row">
+            <div class="cp-label">Active routing mode<small>auto = score-based</small></div>
+          </div>
+          <select class="brain-select" id="cp-brain-select">
+            <option value="auto">auto (score-based)</option>
+            <option value="local">local</option>
+            <option value="remote">remote</option>
+            <option value="smart">smart</option>
+            <option value="native">native</option>
+          </select>
+          <div style="margin-top:10px">
+            <button class="cp-btn" onclick="applyBrain()">Apply</button>
+          </div>
+        </div>
+
+        <!-- Score thresholds -->
+        <div class="cp-card">
+          <div class="cp-title">Score Thresholds</div>
+          <div class="cp-row">
+            <div class="cp-label" style="color:var(--local)">Local<small>score &lt; threshold → local</small></div>
+            <input type="range" class="threshold-slider" id="thr-local" min="0" max="100" value="0" oninput="document.getElementById('thr-local-val').textContent=this.value">
+            <span class="threshold-val" id="thr-local-val">0</span>
+          </div>
+          <div class="cp-row">
+            <div class="cp-label" style="color:var(--remote)">Remote<small>score ≥ threshold → remote</small></div>
+            <input type="range" class="threshold-slider" id="thr-remote" min="0" max="100" value="25" oninput="document.getElementById('thr-remote-val').textContent=this.value">
+            <span class="threshold-val" id="thr-remote-val">25</span>
+          </div>
+          <div class="cp-row">
+            <div class="cp-label" style="color:var(--smart)">Smart<small>score ≥ threshold → smart</small></div>
+            <input type="range" class="threshold-slider" id="thr-smart" min="0" max="100" value="55" oninput="document.getElementById('thr-smart-val').textContent=this.value">
+            <span class="threshold-val" id="thr-smart-val">55</span>
+          </div>
+          <div class="cp-row">
+            <div class="cp-label" style="color:var(--native)">Native<small>score ≥ threshold → native</small></div>
+            <input type="range" class="threshold-slider" id="thr-native" min="0" max="100" value="85" oninput="document.getElementById('thr-native-val').textContent=this.value">
+            <span class="threshold-val" id="thr-native-val">85</span>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button class="cp-btn" onclick="applyThresholds()">Apply</button>
+            <button class="cp-btn cp-btn-danger" onclick="resetThresholds()">Reset</button>
+          </div>
+        </div>
+
+        <!-- Fallback toggles -->
+        <div class="cp-card">
+          <div class="cp-title">Fallback Behavior</div>
+          <div class="cp-row">
+            <div class="cp-label">Ascending fallback<small>on error → try smarter tier</small></div>
+            <label class="toggle">
+              <input type="checkbox" id="fb-ascending" checked onchange="applyFallback()">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </label>
+          </div>
+          <div class="cp-row">
+            <div class="cp-label">Descending fallback<small>on error → try cheaper tier</small></div>
+            <label class="toggle">
+              <input type="checkbox" id="fb-descending" checked onchange="applyFallback()">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Client pins -->
+        <div class="cp-card">
+          <div class="cp-title">Client → Tier Pins</div>
+          <div id="cp-client-pins">
+            <div class="pin-row">
+              <span class="pin-client" style="color:#f97316">claude-code</span>
+              <select class="pin-select" id="pin-claude-code" onchange="applyPin('claude-code',this.value)">
+                <option value="">auto</option>
+                <option value="local">local</option>
+                <option value="remote">remote</option>
+                <option value="smart">smart</option>
+                <option value="native">native</option>
+              </select>
+            </div>
+            <div class="pin-row">
+              <span class="pin-client" style="color:#a78bfa">hermes</span>
+              <select class="pin-select" id="pin-hermes" onchange="applyPin('hermes',this.value)">
+                <option value="">auto</option>
+                <option value="local">local</option>
+                <option value="remote">remote</option>
+                <option value="smart">smart</option>
+                <option value="native">native</option>
+              </select>
+            </div>
+            <div class="pin-row">
+              <span class="pin-client" style="color:#38bdf8">open-webui</span>
+              <select class="pin-select" id="pin-open-webui" onchange="applyPin('open-webui',this.value)">
+                <option value="">auto</option>
+                <option value="local">local</option>
+                <option value="remote">remote</option>
+                <option value="smart">smart</option>
+                <option value="native">native</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Circuit breaker controls -->
+        <div class="cp-card" style="grid-column: span 2;">
+          <div class="cp-title">Circuit Breakers — Manual Control</div>
+          <div id="cp-circuits-list"><span style="color:var(--muted);font-size:0.8rem">Loading…</span></div>
+        </div>
+
+      </div>
+    </section>
+
     <!-- Circuit breakers -->
     <section>
       <h2>Circuit Breakers</h2>
@@ -784,11 +1087,124 @@
       } else {
         circuitDiv.innerHTML = '<span class="healthy-text">✓ All providers healthy</span>';
       }
+
+      // sync control panel
+      syncControlPanel(data);
     };
 
+    // ---- Control panel API calls ----
+    const API = (path, body) => fetch(path, {
+      method: body !== undefined ? 'POST' : 'GET',
+      headers: {'Content-Type': 'application/json', 'x-api-key': 'any'},
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    }).then(r => r.json()).catch(e => console.error(e));
+
+    function applyBrain() {
+      const v = document.getElementById('cp-brain-select').value;
+      API('/v1/cortex/brain', {brain: v});
+    }
+
+    function applyThresholds() {
+      API('/v1/cortex/config/thresholds', {
+        local: +document.getElementById('thr-local').value,
+        remote: +document.getElementById('thr-remote').value,
+        smart: +document.getElementById('thr-smart').value,
+        native: +document.getElementById('thr-native').value,
+      });
+    }
+
+    function resetThresholds() {
+      API('/v1/cortex/config/thresholds', {local:null, remote:null, smart:null, native:null});
+    }
+
+    function applyFallback() {
+      API('/v1/cortex/config/fallback', {
+        ascending: document.getElementById('fb-ascending').checked,
+        descending: document.getElementById('fb-descending').checked,
+      });
+    }
+
+    function applyPin(client, target) {
+      API('/v1/cortex/config/client-pin', {client, target: target || null});
+    }
+
+    function setCircuit(key, state) {
+      API(`/v1/cortex/config/circuit/${key}`, {state});
+    }
+
+    // Sync control panel UI from SSE data
+    function syncControlPanel(data) {
+      const cp = data.control_plane;
+      if (!cp) return;
+
+      // Thresholds
+      const thr = cp.thresholds || {};
+      ['local','remote','smart','native'].forEach(t => {
+        const el = document.getElementById(`thr-${t}`);
+        const val = document.getElementById(`thr-${t}-val`);
+        if (el && thr[t] !== undefined) { el.value = thr[t]; val.textContent = thr[t]; }
+      });
+
+      // Fallback
+      if (cp.fallback_ascending !== undefined)
+        document.getElementById('fb-ascending').checked = cp.fallback_ascending;
+      if (cp.fallback_descending !== undefined)
+        document.getElementById('fb-descending').checked = cp.fallback_descending;
+
+      // Client pins
+      const pins = cp.client_pins || {};
+      ['claude-code','hermes','open-webui'].forEach(c => {
+        const el = document.getElementById(`pin-${c}`);
+        if (el) el.value = pins[c] || '';
+      });
+
+      // Brain
+      const brainSel = document.getElementById('cp-brain-select');
+      if (brainSel && data.brain) brainSel.value = data.brain;
+
+      // Circuit controls
+      const circuitsList = document.getElementById('cp-circuits-list');
+      if (!circuitsList) return;
+      const manual = cp.manual_circuits || {};
+      const auto = data.auto_circuits || {};
+      const tierModels = cp.tier_models || {};
+
+      // Collect all known provider/model keys from tier models
+      const allKeys = new Set([...Object.keys(manual), ...Object.keys(auto)]);
+      Object.values(tierModels).forEach(models => {
+        (models || []).forEach(m => allKeys.add(m));
+      });
+
+      if (allKeys.size === 0) {
+        circuitsList.innerHTML = '<span style="color:var(--muted);font-size:0.8rem">No providers configured</span>';
+        return;
+      }
+
+      circuitsList.innerHTML = [...allKeys].map(key => {
+        const isManualOpen = manual[key] === true;
+        const isManualClosed = manual[key] === false;
+        const autoRemaining = auto[key];
+        let stateLabel, stateClass;
+        if (isManualOpen) { stateLabel = 'DISABLED'; stateClass = 'circuit-open'; }
+        else if (isManualClosed) { stateLabel = 'FORCED ON'; stateClass = 'circuit-manual'; }
+        else if (autoRemaining) { stateLabel = `AUTO OPEN ${autoRemaining}s`; stateClass = 'circuit-open'; }
+        else { stateLabel = 'OK'; stateClass = 'circuit-ok'; }
+
+        return `<div class="circuit-row">
+          <span class="circuit-key" title="${key}">${key}</span>
+          <span class="circuit-state ${stateClass}">${stateLabel}</span>
+          <button class="cp-btn cp-btn-sm ${isManualOpen ? 'cp-btn-danger' : ''}"
+            onclick="setCircuit('${key}', '${isManualOpen ? 'auto' : 'open'}')">
+            ${isManualOpen ? 'Enable' : 'Disable'}
+          </button>
+          ${autoRemaining && !isManualClosed ? `<button class="cp-btn cp-btn-sm" onclick="setCircuit('${key}','closed')">Force On</button>` : ''}
+          ${isManualClosed ? `<button class="cp-btn cp-btn-sm cp-btn-danger" onclick="setCircuit('${key}','auto')">Clear</button>` : ''}
+        </div>`;
+      }).join('');
+    }
+
     // ---- SSE connection ----
-    let es;
-    function connect() {
+    let es;    function connect() {
       connText.textContent = 'connecting…';
       dot.style.background = 'var(--yellow)';
       dot.style.boxShadow = '0 0 14px var(--yellow-glow)';

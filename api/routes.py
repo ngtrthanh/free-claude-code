@@ -219,7 +219,8 @@ async def set_cortex_brain(request: Request, _auth=Depends(require_api_key)):
 
     Returns the active brain after the change.
     """
-    from providers.registry import set_cortex_brain, CORTEX_TIER_ORDER as TIER_ORDER
+    from providers.registry import CORTEX_TIER_ORDER as TIER_ORDER
+    from providers.registry import set_cortex_brain
 
     body = await request.json()
     brain = body.get("brain", "auto")
@@ -251,3 +252,151 @@ async def get_cortex_brain(_auth=Depends(require_api_key)):
         "brain": override or "auto",
         "mode": "automatic" if override is None else "override",
     }
+
+
+# =============================================================================
+# Cortex control plane
+# =============================================================================
+
+
+@router.get("/v1/cortex/config")
+async def get_cortex_config(_auth=Depends(require_api_key)):
+    """Return full live Cortex control plane state."""
+    from providers.registry import (
+        get_cortex_brain as _get_brain,
+        get_cortex_circuit_status as _get_circuits,
+        get_cortex_control_plane as _get_cp,
+    )
+    from core.cortex_metrics import CortexMetrics
+
+    cp = _get_cp()
+    metrics = CortexMetrics.get()
+    snap = await metrics.snapshot()
+    # Use the already-pushed control_plane from metrics (populated after first request)
+    # Fall back to a fresh snapshot with no tier_config defaults
+    control_plane = snap.get("control_plane") or cp.snapshot(None)
+
+    return {
+        "control_plane": control_plane,
+        "auto_circuits": _get_circuits(),
+        "brain": _get_brain() or "auto",
+    }
+
+
+@router.post("/v1/cortex/config/thresholds")
+async def set_cortex_thresholds(request: Request, _auth=Depends(require_api_key)):
+    """Update score thresholds for one or more tiers.
+
+    Body: {"local": 0, "remote": 25, "smart": 55, "native": 85}
+    Pass null to reset a tier to its env default.
+    """
+    from providers.registry import get_cortex_control_plane as _get_cp
+
+    body = await request.json()
+    cp = _get_cp()
+    updated = {}
+    for tier, value in body.items():
+        cp.set_threshold(tier, int(value) if value is not None else None)
+        updated[tier] = value
+    await _push_cp()
+    return {"updated": updated}
+
+
+@router.post("/v1/cortex/config/circuit/{key:path}")
+async def set_cortex_circuit(
+    key: str, request: Request, _auth=Depends(require_api_key)
+):
+    """Manually open or close a circuit for a provider/model.
+
+    key: "provider_id/model_name" e.g. "lmstudio/google/gemma-4-e4b"
+    Body: {"state": "open"} | {"state": "closed"} | {"state": "auto"}
+    """
+    from providers.registry import get_cortex_control_plane as _get_cp
+
+    body = await request.json()
+    state = body.get("state", "auto")
+    cp = _get_cp()
+
+    if state == "open":
+        cp.force_circuit_open(key)
+    elif state == "closed":
+        cp.force_circuit_closed(key)
+    else:
+        cp.clear_circuit_override(key)
+
+    await _push_cp()
+    return {"key": key, "state": state}
+
+
+@router.post("/v1/cortex/config/client-pin")
+async def set_client_pin(request: Request, _auth=Depends(require_api_key)):
+    """Pin a client to a tier or provider/model.
+
+    Body: {"client": "hermes", "target": "smart"}
+          {"client": "claude-code", "target": "nvidia_nim/deepseek-ai/deepseek-v4-pro"}
+          {"client": "hermes", "target": null}  — clear pin
+    """
+    from providers.registry import get_cortex_control_plane as _get_cp
+
+    body = await request.json()
+    client = body.get("client", "")
+    target = body.get("target")
+    cp = _get_cp()
+
+    if not client:
+        raise HTTPException(status_code=400, detail="client is required")
+
+    if target:
+        cp.set_client_pin(client, target)
+        await _push_cp()
+        return {"client": client, "target": target}
+    else:
+        cp.clear_client_pin(client)
+        await _push_cp()
+        return {"client": client, "target": None}
+
+
+async def _push_cp() -> None:
+    from providers.registry import push_cortex_control_plane
+
+    await push_cortex_control_plane()
+
+
+@router.post("/v1/cortex/config/tier-models")
+async def set_tier_models(request: Request, _auth=Depends(require_api_key)):
+    """Override models for a tier at runtime.
+
+    Body: {"tier": "smart", "models": ["nvidia_nim/deepseek-ai/deepseek-v4-pro"]}
+          {"tier": "local", "models": null}  — reset to env default
+    """
+    from providers.registry import get_cortex_control_plane as _get_cp
+
+    body = await request.json()
+    tier = body.get("tier", "")
+    models = body.get("models")
+    cp = _get_cp()
+
+    if not tier:
+        raise HTTPException(status_code=400, detail="tier is required")
+
+    cp.set_tier_models(tier, models)
+    await _push_cp()
+    return {"tier": tier, "models": models}
+
+
+@router.post("/v1/cortex/config/fallback")
+async def set_fallback(request: Request, _auth=Depends(require_api_key)):
+    """Toggle fallback behavior.
+
+    Body: {"ascending": true, "descending": false}
+    """
+    from providers.registry import get_cortex_control_plane as _get_cp
+
+    body = await request.json()
+    cp = _get_cp()
+    cp.set_fallback(
+        ascending=body.get("ascending"),
+        descending=body.get("descending"),
+    )
+    await _push_cp()
+    return {"ascending": body.get("ascending"), "descending": body.get("descending")}

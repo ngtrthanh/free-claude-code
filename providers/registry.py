@@ -7,6 +7,10 @@ Public brain-override API for Cortex is also re-exported here so that
 from __future__ import annotations
 
 from collections.abc import Callable, MutableMapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from providers.cortex.control_plane import CortexControlPlane
 
 from config.provider_catalog import (
     PROVIDER_CATALOG,
@@ -15,6 +19,7 @@ from config.provider_catalog import (
 )
 from config.settings import Settings
 from providers.base import BaseProvider, ProviderConfig
+from providers.cortex.scorer import TIER_ORDER as CORTEX_TIER_ORDER
 from providers.exceptions import AuthenticationError, UnknownProviderTypeError
 
 ProviderFactory = Callable[[ProviderConfig, Settings], BaseProvider]
@@ -248,10 +253,30 @@ async def set_cortex_brain(value: str | None) -> None:
     await set_brain_override(value)
 
 
-# Re-export tier constants so api/ doesn't need to import providers.cortex directly
-from providers.cortex.scorer import TIER_ORDER as CORTEX_TIER_ORDER
+async def push_cortex_control_plane() -> None:
+    """Push current control plane state to metrics (call after config changes)."""
+    from providers.cortex.provider import _push_control_plane_to_metrics
 
+    await _push_control_plane_to_metrics()
+
+
+def get_cortex_control_plane() -> CortexControlPlane:
+    """Return the Cortex control plane singleton."""
+    from providers.cortex.control_plane import get_control_plane
+
+    return get_control_plane()
+
+
+def get_cortex_circuit_status() -> dict[str, float]:
+    """Return auto circuit breaker status."""
+    from providers.cortex.provider import get_circuit_status
+
+    return get_circuit_status()
+
+
+# Re-export tier constants so api/ doesn't need to import providers.cortex directly
 __all__ = [
+    "CORTEX_TIER_ORDER",
     "PROVIDER_DESCRIPTORS",
     "PROVIDER_FACTORIES",
     "ProviderRegistry",
@@ -260,5 +285,4 @@ __all__ = [
     "get_cortex_brain",
     "set_cortex_brain",
     "set_cortex_brain_sync",
-    "CORTEX_TIER_ORDER",
 ]

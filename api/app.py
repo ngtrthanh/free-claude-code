@@ -14,10 +14,10 @@ from config.logging_config import configure_logging
 from config.settings import get_settings
 from providers.exceptions import ProviderError
 
+from .dashboard import dashboard_router
 from .routes import router
 from .runtime import AppRuntime
 from .validation_log import summarize_request_validation_body
-from .dashboard import dashboard_router
 
 
 @asynccontextmanager

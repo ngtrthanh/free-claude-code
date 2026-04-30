@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cortex Dashboard</title>
+  <!-- Google Fonts for clean typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --surface: rgba(15, 15, 20, 0.7);
+      --card-bg: rgba(18, 18, 24, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f0f0f6;
+      --muted: #8e8e9a;
+      --accent: #6c8cff;
+      --accent-glow: rgba(108, 140, 255, 0.3);
+      --green: #4ade80;
+      --green-glow: rgba(74, 222, 128, 0.3);
+      --yellow: #fbbf24;
+      --yellow-glow: rgba(251, 191, 36, 0.25);
+      --red: #f87171;
+      --red-glow: rgba(248, 113, 113, 0.3);
+      --purple: #c084fc;
+      --orange: #fb923c;
+      --local: #4ade80;
+      --remote: #6c8cff;
+      --smart: #fbbf24;
+      --native: #f87171;
+      --direct: #c084fc;
+      --fallback: #8e8e9a;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(ellipse at 20% 50%, rgba(108,140,255,0.07) 0%, transparent 50%),
+                  radial-gradient(ellipse at 80% 20%, rgba(74,222,128,0.05) 0%, transparent 50%),
+                  var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      backdrop-filter: blur(0px); /* for potential future glass */
+    }
+
+    /* ---- Header ---- */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 28px;
+      background: rgba(12, 12, 18, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .connection-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px var(--green-glow);
+      animation: pulse 2s infinite;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.2); }
+    }
+
+    .connection-text {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: capitalize;
+      letter-spacing: 0.02em;
+    }
+
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #a5b4fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.01em;
+    }
+
+    .brain-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .brain-auto { background: rgba(108,140,255,0.15); color: #6c8cff; }
+    .brain-local { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .brain-remote { background: rgba(108,140,255,0.15); color: #6c8cff; }
+    .brain-smart { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .brain-native { background: rgba(248,113,113,0.15); color: #f87171; }
+    .brain-direct { background: rgba(192,132,252,0.15); color: #c084fc; }
+
+    .last-update {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- Main Content ---- */
+    main {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 24px 28px 40px;
+    }
+
+    /* ---- Stats Cards ---- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 20px;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    .card-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .card-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ---- Chart Cards ---- */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 700px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    .bar-chart {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      height: 80px;
+      padding: 8px 0;
+    }
+
+    .bar-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 40px;
+      border-radius: 6px 6px 0 0;
+      transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 4px;
+      background: linear-gradient(180deg, var(--bar-color, #6c8cff) 0%, rgba(var(--bar-color-rgb),0.4) 100%);
+    }
+
+    .bar-count {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bar-label {
+      font-size: 0.6rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 60px;
+    }
+
+    /* ---- Section Titles ---- */
+    section {
+      margin-top: 28px;
+    }
+
+    section h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 14px;
+      padding-left: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    section h2::before {
+      content: '';
+      width: 4px;
+      height: 16px;
+      background: var(--accent);
+      border-radius: 4px;
+    }
+
+    /* ---- Tables ---- */
+    .table-container {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: rgba(15,15,22,0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 650px;
+    }
+
+    caption {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    thead th {
+      text-align: left;
+      padding: 14px 16px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: rgba(0,0,0,0.2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+    }
+
+    tbody td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.8rem;
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr {
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover td {
+      background: rgba(255,255,255,0.03);
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+      text-align: center;
+      padding: 28px 16px !important;
+    }
+
+    /* ---- Special Table Elements ---- */
+    .tier-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: inherit;
+    }
+
+    .tier-local { color: var(--local); border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); }
+    .tier-remote { color: var(--remote); border-color: rgba(108,140,255,0.25); background: rgba(108,140,255,0.08); }
+    .tier-smart { color: var(--smart); border-color: rgba(251,191,36,0.25); background: rgba(251,191,36,0.08); }
+    .tier-native { color: var(--native); border-color: rgba(248,113,113,0.25); background: rgba(248,113,113,0.08); }
+    .tier-direct { color: var(--direct); border-color: rgba(192,132,252,0.25); background: rgba(192,132,252,0.08); }
+    .tier-fallback { color: var(--fallback); border-color: rgba(142,142,154,0.25); background: rgba(142,142,154,0.08); }
+
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .score-bar span:first-child {
+      min-width: 26px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-track {
+      flex: 1;
+      height: 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      max-width: 80px;
+    }
+
+    .score-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      background: linear-gradient(90deg, #4ade80, #22c55e);
+    }
+
+    .tps-value {
+      color: var(--green);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .provider-name {
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+
+    .model-name {
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+
+    .success-dot {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .fail-dot {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .fallback-count {
+      color: var(--yellow);
+      font-size: 0.65rem;
+      margin-left: 6px;
+      background: rgba(251,191,36,0.1);
+      padding: 1px 5px;
+      border-radius: 8px;
+    }
+
+    .elapsed {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .circuit-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      margin: 4px 8px 4px 0;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.3);
+      color: #f87171;
+      backdrop-filter: blur(8px);
+    }
+
+    .healthy-text {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #4ade80;
+      background: rgba(74,222,128,0.08);
+      border: 1px solid rgba(74,222,128,0.2);
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card, section {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    /* Responsive finetuning */
+    @media (max-width: 600px) {
+      header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="connection-indicator">
+      <div class="status-dot" id="dot" aria-hidden="true"></div>
+      <span class="connection-text" id="connection-status">connected</span>
+    </div>
+    <h1>⚡ Cortex</h1>
+    <span id="brain-badge" class="brain-badge brain-auto">auto</span>
+    <span class="last-update" id="last-update">—</span>
+  </header>
+
+  <main>
+    <!-- Overview Cards -->
+    <div class="stats-grid" aria-label="Key metrics">
+      <div class="card">
+        <div class="card-label">Active Connections</div>
+        <div class="card-value" id="active-count">0</div>
+        <div class="card-sub" id="active-tps">0 tok/s</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Total Requests</div>
+        <div class="card-value" id="total-req">0</div>
+        <div class="card-sub" id="total-fallbacks">0 fallbacks</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Tokens In</div>
+        <div class="card-value" id="tokens-in">0</div>
+        <div class="card-sub">input tokens total</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Tokens Out</div>
+        <div class="card-value" id="tokens-out">0</div>
+        <div class="card-sub">output tokens total</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-label" style="margin-bottom:14px">Requests by Tier</div>
+        <div class="bar-chart" id="tier-chart" aria-label="Tier distribution bar chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-label" style="margin-bottom:14px">Requests by Provider</div>
+        <div class="bar-chart" id="provider-chart" aria-label="Provider distribution bar chart"></div>
+      </div>
+    </div>
+
+    <!-- Circuit Breakers -->
+    <section>
+      <h2>Circuit Breakers</h2>
+      <div id="circuit-status" style="display:flex; flex-wrap:wrap; gap:8px; padding:4px 0"></div>
+    </section>
+
+    <!-- Active Streams -->
+    <section>
+      <h2>Active Streams</h2>
+      <div class="table-container">
+        <table id="active-table">
+          <caption>List of currently active streams with request details</caption>
+          <thead>
+            <tr>
+              <th>Request ID</th><th>Model</th><th>Tier</th><th>Score</th>
+              <th>Provider</th><th>Tokens Out</th><th>Speed</th><th>Elapsed</th>
+            </tr>
+          </thead>
+          <tbody id="active-body"><tr><td colspan="8" class="empty">No active streams</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Routing History -->
+    <section>
+      <h2>Recent Routing History</h2>
+      <div class="table-container">
+        <table id="history-table">
+          <caption>Last 20 routing requests with status and performance</caption>
+          <thead>
+            <tr>
+              <th>Request ID</th><th>Model</th><th>Tier</th><th>Score</th>
+              <th>Provider</th><th>In</th><th>Out</th><th>Speed</th><th>Duration</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"><tr><td colspan="10" class="empty">No history yet</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  (function() {
+    const TIER_COLORS = {
+      local: '#4ade80', remote: '#6c8cff', smart: '#fbbf24',
+      native: '#f87171', direct: '#c084fc', fallback: '#8e8e9a', auto: '#6c8cff'
+    };
+
+    const PROVIDER_COLORS = {
+      nvidia_nim: '#76b900', open_router: '#a78bfa', deepseek: '#60a5fa',
+      lmstudio: '#fb923c', ollama: '#38bdf8', llamacpp: '#f43f5e', cortex: '#6c8cff'
+    };
+
+    const dot = document.getElementById('dot');
+    const connectionStatus = document.getElementById('connection-status');
+    const brainBadge = document.getElementById('brain-badge');
+    const lastUpdate = document.getElementById('last-update');
+    const activeCount = document.getElementById('active-count');
+    const activeTps = document.getElementById('active-tps');
+    const totalReq = document.getElementById('total-req');
+    const totalFallbacks = document.getElementById('total-fallbacks');
+    const tokensIn = document.getElementById('tokens-in');
+    const tokensOut = document.getElementById('tokens-out');
+    const tierChart = document.getElementById('tier-chart');
+    const providerChart = document.getElementById('provider-chart');
+    const activeBody = document.getElementById('active-body');
+    const historyBody = document.getElementById('history-body');
+    const circuitStatus = document.getElementById('circuit-status');
+
+    // helpers
+    function tierPill(tier) {
+      return `<span class="tier-pill tier-${tier}">${tier}</span>`;
+    }
+
+    function scoreBar(score) {
+      const pct = Math.min(Math.max(score, 0), 100);
+      let color;
+      if (pct < 25) color = '#4ade80';
+      else if (pct < 55) color = '#6c8cff';
+      else if (pct < 85) color = '#fbbf24';
+      else color = '#f87171';
+      return `<div class="score-bar">
+        <span>${score}</span>
+        <div class="score-track"><div class="score-fill" style="width:${pct}%;background:${color}"></div></div>
+      </div>`;
+    }
+
+    function fmtNum(n) {
+      if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+      if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+      if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+      return n.toString();
+    }
+
+    function renderBarChart(el, data, colorMap) {
+      if (!data || Object.keys(data).length === 0) {
+        el.innerHTML = '<span style="color:var(--muted);font-size:0.75rem;padding:8px">No data</span>';
+        return;
+      }
+      const max = Math.max(...Object.values(data), 1);
+      el.innerHTML = Object.entries(data).map(([k, v]) => {
+        const h = Math.max(6, Math.round((v / max) * 64));
+        const color = colorMap[k] || '#8e8e9a';
+        return `<div class="bar-wrap">
+          <div class="bar-count">${v}</div>
+          <div class="bar" style="height:${h}px; --bar-color:${color}; --bar-color-rgb:${hexToRgb(color)}" aria-label="${k}: ${v}"></div>
+          <div class="bar-label">${k}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // simple hex to rgb for gradient
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `${parseInt(result[1],16)}, ${parseInt(result[2],16)}, ${parseInt(result[3],16)}` : '108,140,255';
+    }
+
+    function update(data) {
+      // Brain badge
+      const brain = data.brain || 'auto';
+      brainBadge.textContent = brain;
+      brainBadge.className = `brain-badge brain-${brain.split('/')[0]}`;
+      lastUpdate.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      connectionStatus.textContent = 'connected';
+      dot.style.background = 'var(--green)';
+      dot.style.boxShadow = '0 0 12px var(--green-glow)';
+
+      // Stats
+      activeCount.textContent = data.active_connections;
+      activeTps.textContent = `${data.current_tps || 0} tok/s`;
+      totalReq.textContent = fmtNum(data.totals.requests);
+      totalFallbacks.textContent = `${data.totals.fallbacks} fallbacks`;
+      tokensIn.textContent = fmtNum(data.totals.tokens_in);
+      tokensOut.textContent = fmtNum(data.totals.tokens_out);
+
+      // Charts
+      renderBarChart(tierChart, data.tier_counts, TIER_COLORS);
+      renderBarChart(providerChart, data.provider_counts, PROVIDER_COLORS);
+
+      // Active streams
+      if (!data.active || data.active.length === 0) {
+        activeBody.innerHTML = '<tr><td colspan="8" class="empty">No active streams</td></tr>';
+      } else {
+        activeBody.innerHTML = data.active.map(r => `<tr>
+          <td style="font-size:0.75rem;color:var(--muted);font-family:var(--mono)">${r.request_id.slice(-8)}</td>
+          <td>${r.model}</td>
+          <td>${tierPill(r.tier)}</td>
+          <td>${scoreBar(r.score)}</td>
+          <td><span class="provider-name">${r.provider_id}</span><br><span class="model-name">${r.provider_model}</span></td>
+          <td>${fmtNum(r.output_tokens)}</td>
+          <td class="tps-value">${r.tokens_per_second} t/s</td>
+          <td class="elapsed">${r.elapsed_s}s</td>
+        </tr>`).join('');
+      }
+
+      // History
+      if (!data.history || data.history.length === 0) {
+        historyBody.innerHTML = '<tr><td colspan="10" class="empty">No history yet</td></tr>';
+      } else {
+        historyBody.innerHTML = data.history.slice(0, 20).map(r => {
+          const statusIcon = r.success ? '<span class="success-dot">✓</span>' : '<span class="fail-dot">✗</span>';
+          const fbInfo = r.fallback_count > 0 ? `<span class="fallback-count">${r.fallback_count}fb</span>` : '';
+          return `<tr>
+            <td style="font-size:0.75rem;color:var(--muted);font-family:var(--mono)">${r.request_id.slice(-8)}</td>
+            <td>${r.model}</td>
+            <td>${tierPill(r.tier)}</td>
+            <td>${scoreBar(r.score)}</td>
+            <td><span class="provider-name">${r.provider_id}</span><br><span class="model-name">${r.provider_model}</span></td>
+            <td>${fmtNum(r.input_tokens)}</td>
+            <td>${fmtNum(r.output_tokens)}</td>
+            <td class="tps-value">${r.tokens_per_second} t/s</td>
+            <td>${r.duration_s}s</td>
+            <td>${statusIcon}${fbInfo}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      // Circuits
+      const circuits = data.circuits || {};
+      const circuitKeys = Object.keys(circuits);
+      if (circuitKeys.length > 0) {
+        circuitStatus.innerHTML = circuitKeys.map(k =>
+          `<span class="circuit-badge">⚡ ${k} (${circuits[k]}s)</span>`
+        ).join('');
+      } else {
+        circuitStatus.innerHTML = '<span class="healthy-text">✓ All providers healthy</span>';
+      }
+    }
+
+    // SSE
+    let eventSource;
+    function connect() {
+      connectionStatus.textContent = 'connecting...';
+      dot.style.background = 'var(--yellow)';
+      dot.style.boxShadow = '0 0 12px var(--yellow-glow)';
+
+      eventSource = new EventSource('/dashboard/stream');
+      eventSource.onopen = () => {
+        connectionStatus.textContent = 'connected';
+        dot.style.background = 'var(--green)';
+        dot.style.boxShadow = '0 0 12px var(--green-glow)';
+      };
+      eventSource.onmessage = (e) => {
+        try { update(JSON.parse(e.data)); } catch(err) { console.error(err); }
+      };
+      eventSource.onerror = () => {
+        connectionStatus.textContent = 'disconnected';
+        dot.style.background = 'var(--red)';
+        dot.style.boxShadow = '0 0 12px var(--red-glow)';
+        eventSource.close();
+        setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+  })();
+  </script>
+</body>
+</html>

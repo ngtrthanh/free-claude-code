@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from providers.cortex.scorer import (
     TIER_LOCAL,
     TIER_NATIVE,
@@ -64,9 +62,7 @@ class TestScoreRequest:
 
     def test_long_conversation_adds_score(self) -> None:
         short = _make_request(messages=[{"role": "user", "content": "hi"}])
-        long = _make_request(
-            messages=[{"role": "user", "content": "hi"}] * 20
-        )
+        long = _make_request(messages=[{"role": "user", "content": "hi"}] * 20)
         assert score_request(long) > score_request(short)
 
     def test_score_capped_at_100(self) -> None:

@@ -111,6 +111,9 @@ class CortexMetrics:
         self._circuits: dict[str, float] = {}
         # Brain override pushed by the provider
         self._brain: str = "auto"
+        # Control plane state pushed by the provider layer
+        self._control_plane: dict[str, Any] = {}
+        self._auto_circuits: dict[str, float] = {}
 
     @classmethod
     def get(cls) -> CortexMetrics:
@@ -217,6 +220,14 @@ class CortexMetrics:
         async with self._lock:
             self._brain = brain or "auto"
 
+    async def update_control_plane(
+        self, control_plane: dict[str, Any], auto_circuits: dict[str, float]
+    ) -> None:
+        """Update control plane state (called by the provider layer)."""
+        async with self._lock:
+            self._control_plane = control_plane
+            self._auto_circuits = auto_circuits
+
     # ── Snapshot ───────────────────────────────────────────────────────────────
 
     async def snapshot(self) -> dict[str, Any]:
@@ -240,6 +251,11 @@ class CortexMetrics:
             if now - (r.get("elapsed_s", 0) + time.monotonic() - now) < 5
         )
 
+        # Control plane state — pushed via update_control_plane() by the provider layer
+        async with self._lock:
+            control_plane = dict(self._control_plane)
+            auto_circuits = dict(self._auto_circuits)
+
         return {
             "brain": brain,
             "active_connections": len(active),
@@ -256,6 +272,8 @@ class CortexMetrics:
             "tier_counts": tier_counts,
             "client_counts": client_counts,
             "circuits": circuits,
+            "auto_circuits": auto_circuits,
+            "control_plane": control_plane,
             "timestamp": time.time(),
         }
 
@@ -267,10 +285,10 @@ class CortexMetrics:
         return q
 
     def unsubscribe(self, q: asyncio.Queue[dict[str, Any]]) -> None:
-        try:
+        import contextlib
+
+        with contextlib.suppress(ValueError):
             self._subscribers.remove(q)
-        except ValueError:
-            pass
 
     async def _broadcast(self) -> None:
         snap = await self.snapshot()
