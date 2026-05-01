@@ -118,6 +118,15 @@ PROVIDER_CATALOG: dict[str, ProviderDescriptor] = {
             "local",
         ),
     ),
+    "xiaomi": ProviderDescriptor(
+        provider_id="xiaomi",
+        transport_type="anthropic_messages",
+        credential_env="XIAOMI_API_KEY",
+        credential_attr="xiaomi_api_key",
+        default_base_url="https://api.xiaomimimo.com/anthropic/v1",
+        base_url_attr="xiaomi_base_url",
+        capabilities=("chat", "streaming", "tools", "thinking", "native_anthropic"),
+    ),
 }
 
 # Order matches docs / historical error text; must match PROVIDER_CATALOG keys.

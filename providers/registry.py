@@ -104,6 +104,12 @@ def _create_ollama(config: ProviderConfig, _settings: Settings) -> BaseProvider:
     return OllamaProvider(config)
 
 
+def _create_xiaomi(config: ProviderConfig, _settings: Settings) -> BaseProvider:
+    from providers.xiaomi import XiaomiProvider
+
+    return XiaomiProvider(config)
+
+
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "cortex": _create_cortex,
     "openai_compat": _create_openai_compat,
@@ -113,6 +119,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "lmstudio": _create_lmstudio,
     "llamacpp": _create_llamacpp,
     "ollama": _create_ollama,
+    "xiaomi": _create_xiaomi,
 }
 
 if set(PROVIDER_DESCRIPTORS) != set(SUPPORTED_PROVIDER_IDS) or set(

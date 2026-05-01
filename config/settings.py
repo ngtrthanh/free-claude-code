@@ -144,6 +144,13 @@ class Settings(BaseSettings):
         validation_alias="OLLAMA_BASE_URL",
     )
 
+    # ==================== Xiaomi MiMo Config ====================
+    xiaomi_api_key: str = Field(default="", validation_alias="XIAOMI_API_KEY")
+    xiaomi_base_url: str = Field(
+        default="https://api.xiaomimimo.com/anthropic/v1",
+        validation_alias="XIAOMI_BASE_URL",
+    )
+
     # ==================== Model ====================
     # All Claude model requests are mapped to this single model (fallback)
     # Format: provider_type/model/name
