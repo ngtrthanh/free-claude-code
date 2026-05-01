@@ -114,9 +114,10 @@ async def create_message(
 ):
     """Create a message (always streaming)."""
     from api.client_detection import detect_client
-    from core.request_context import current_client
+    from core.request_context import current_client, original_model
 
     current_client.set(detect_client(request))
+    original_model.set(request_data.model)
     return service.create_message(request_data)
 
 

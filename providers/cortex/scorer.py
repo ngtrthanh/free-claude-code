@@ -28,6 +28,16 @@ TIER_ORDER = (TIER_LOCAL, TIER_REMOTE, TIER_SMART, TIER_NATIVE)
 
 def _model_tier_score(model_name: str) -> int:
     """Return a base score from the Claude model tier hint."""
+    # Check original model name from request context (before routing)
+    try:
+        from core.request_context import original_model
+
+        orig = original_model.get()
+        if orig:
+            model_name = orig
+    except Exception:
+        pass
+
     name = model_name.lower()
     if "opus" in name:
         return 40
